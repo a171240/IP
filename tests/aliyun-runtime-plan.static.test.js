@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const { execFileSync, spawnSync } = require("node:child_process")
@@ -51,6 +53,20 @@ test("Aliyun runtime plan treats RDS PostgreSQL as a runtime readiness dependenc
     "OSS_RUNTIME_ACCESS",
     "BACKEND_ENV_IMPORT",
   ])
+  assert.deepEqual(report.personalTrialReservationExpiryScheduler, {
+    provider: "Aliyun EventBridge",
+    region: "cn-hangzhou",
+    cronExpression: "0 */5 * * * *",
+    targetType: "API destination",
+    targetMethod: "GET",
+    targetUrl:
+      "https://api-cn.ipgongchang.xin/api/cron/personal-trial-reservations",
+    authenticationHeaderName: "Authorization",
+    authenticationSecretName: "CRON_SECRET",
+    requiredBeforePersonalTrialPublicEnable: true,
+    provisioned: false,
+    verificationStatus: "not_run",
+  })
 
   assert.equal(plan.dataLayer.formalTarget, "Aliyun RDS PostgreSQL")
   assert.equal(plan.dataLayer.connectionEnvName, "DATABASE_URL_CN")
@@ -125,6 +141,81 @@ test("Aliyun runtime plan checker rejects missing or relaxed voice-coach reposit
         cwd: root,
         encoding: "utf8",
       })
+
+      assert.equal(result.status, 1)
+      const report = JSON.parse(result.stdout)
+      assert.ok(report.blockers.includes(testCase.blocker))
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    }
+  }
+})
+
+test("Aliyun runtime plan checker rejects missing or misrouted personal-trial expiry scheduling", () => {
+  const canonicalPlan = readJson("deploy", "aliyun-production-cn.runtime-plan.json")
+  const cases = [
+    {
+      blocker: "scheduledRequests:PERSONAL_TRIAL_RESERVATION_EXPIRY",
+      mutate(plan) {
+        plan.scheduledRequests = []
+      },
+    },
+    {
+      blocker:
+        "scheduledRequests:PERSONAL_TRIAL_RESERVATION_EXPIRY:provider=Aliyun EventBridge",
+      mutate(plan) {
+        plan.scheduledRequests[0].provider = "Vercel"
+      },
+    },
+    {
+      blocker:
+        "scheduledRequests:PERSONAL_TRIAL_RESERVATION_EXPIRY:cronExpression=0 */5 * * * *",
+      mutate(plan) {
+        plan.scheduledRequests[0].schedule.cronExpression = "0 0 0 * * *"
+      },
+    },
+    {
+      blocker:
+        "scheduledRequests:PERSONAL_TRIAL_RESERVATION_EXPIRY:target.url",
+      mutate(plan) {
+        plan.scheduledRequests[0].target.url =
+          "https://ip-a171240s-projects.vercel.app/api/cron/personal-trial-reservations"
+      },
+    },
+    {
+      blocker:
+        "scheduledRequests:PERSONAL_TRIAL_RESERVATION_EXPIRY:authentication.headerName=Authorization",
+      mutate(plan) {
+        plan.scheduledRequests[0].target.authentication.headerName =
+          "x-cron-secret"
+      },
+    },
+    {
+      blocker:
+        "scheduledRequests:PERSONAL_TRIAL_RESERVATION_EXPIRY:requiredBeforePersonalTrialPublicEnable=true",
+      mutate(plan) {
+        plan.scheduledRequests[0].requiredBeforePersonalTrialPublicEnable = false
+      },
+    },
+  ]
+
+  for (const testCase of cases) {
+    const plan = structuredClone(canonicalPlan)
+    testCase.mutate(plan)
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "aliyun-runtime-plan-personal-trial-expiry-"),
+    )
+    const planPath = path.join(tempDir, "runtime-plan.json")
+    try {
+      fs.writeFileSync(planPath, JSON.stringify(plan, null, 2))
+      const result = spawnSync(
+        process.execPath,
+        ["scripts/check-aliyun-runtime-plan.mjs", "--plan", planPath],
+        {
+          cwd: root,
+          encoding: "utf8",
+        },
+      )
 
       assert.equal(result.status, 1)
       const report = JSON.parse(result.stdout)

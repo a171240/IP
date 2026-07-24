@@ -13,6 +13,37 @@
     "strictHealthPath": "/api/app/health?strict=1",
     "publicIngress": true
   },
+  "scheduledRequests": [
+    {
+      "id": "PERSONAL_TRIAL_RESERVATION_EXPIRY",
+      "provider": "Aliyun EventBridge",
+      "region": "cn-hangzhou",
+      "sourceType": "time-triggered custom event source",
+      "schedule": {
+        "type": "cron",
+        "cronExpression": "0 */5 * * * *",
+        "timeZone": "Asia/Shanghai"
+      },
+      "target": {
+        "type": "API destination",
+        "network": "Internet",
+        "method": "GET",
+        "url": "https://api-cn.ipgongchang.xin/api/cron/personal-trial-reservations",
+        "authentication": {
+          "type": "API key header",
+          "headerName": "Authorization",
+          "secretName": "CRON_SECRET",
+          "valueFormat": "Bearer <secret>",
+          "secretStorage": "Aliyun EventBridge connection"
+        }
+      },
+      "requiredBeforePersonalTrialPublicEnable": true,
+      "requiresSeparateAuthorization": true,
+      "provisioned": false,
+      "verificationStatus": "not_run",
+      "containsValues": false
+    }
+  ],
   "image": {
     "provider": "Aliyun ACR",
     "localImage": "meiye-huajing-app-api:production-cn",

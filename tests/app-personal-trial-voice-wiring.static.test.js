@@ -142,7 +142,7 @@ test("only server technical failures map to the four release reasons", () => {
   )
 })
 
-test("expired reservations have a bounded authenticated cron sweep", () => {
+test("expired reservations expose an Aliyun-scheduled authenticated sweep", () => {
   const repository = read(
     "lib",
     "aliyun-rds",
@@ -157,6 +157,9 @@ test("expired reservations have a bounded authenticated cron sweep", () => {
     "route.ts",
   )
   const vercel = JSON.parse(read("vercel.json"))
+  const aliyunRuntimePlan = JSON.parse(
+    read("deploy", "aliyun-production-cn.runtime-plan.json"),
+  )
 
   assert.match(repository, /expireAllPersonalTrialVoiceReservations/)
   assert.match(repository, /for update skip locked/i)
@@ -164,12 +167,31 @@ test("expired reservations have a bounded authenticated cron sweep", () => {
   assert.match(cronRoute, /process\.env\.CRON_SECRET/)
   assert.match(cronRoute, /Bearer \$\{secret\}/)
   assert.match(cronRoute, /expireAllPersonalTrialVoiceReservations/)
-  assert(
+  assert.equal(aliyunRuntimePlan.target.provider, "SAE")
+  assert.equal(aliyunRuntimePlan.target.runtime, "custom-container")
+  assert.equal(Array.isArray(aliyunRuntimePlan.scheduledRequests), true)
+  const expiryScheduler = aliyunRuntimePlan.scheduledRequests.find(
+    (scheduledRequest) =>
+      scheduledRequest.id === "PERSONAL_TRIAL_RESERVATION_EXPIRY",
+  )
+  assert.equal(expiryScheduler.provider, "Aliyun EventBridge")
+  assert.equal(expiryScheduler.schedule.cronExpression, "0 */5 * * * *")
+  assert.equal(expiryScheduler.target.type, "API destination")
+  assert.equal(expiryScheduler.target.method, "GET")
+  assert.equal(
+    expiryScheduler.target.url,
+    "https://api-cn.ipgongchang.xin/api/cron/personal-trial-reservations",
+  )
+  assert.equal(expiryScheduler.target.authentication.headerName, "Authorization")
+  assert.equal(expiryScheduler.target.authentication.secretName, "CRON_SECRET")
+  assert.equal(expiryScheduler.requiredBeforePersonalTrialPublicEnable, true)
+  assert.equal(expiryScheduler.provisioned, false)
+  assert.equal(expiryScheduler.verificationStatus, "not_run")
+  assert.equal(
     vercel.crons.some(
-      (cron) =>
-        cron.path === "/api/cron/personal-trial-reservations" &&
-        cron.schedule === "*/5 * * * *",
+      (cron) => cron.path === "/api/cron/personal-trial-reservations",
     ),
+    false,
   )
 })
 

@@ -91,6 +91,103 @@ function validatePlan(plan) {
   if (target.strictHealthPath !== "/api/app/health?strict=1") blockers.push("target.strictHealthPath")
   if (target.publicIngress !== true) blockers.push("target.publicIngress=true")
 
+  const scheduledRequests = Array.isArray(plan.scheduledRequests)
+    ? plan.scheduledRequests
+    : []
+  const personalTrialExpiryScheduler = scheduledRequests.find(
+    (item) => item.id === "PERSONAL_TRIAL_RESERVATION_EXPIRY",
+  )
+  const personalTrialExpirySchedulerPrefix =
+    "scheduledRequests:PERSONAL_TRIAL_RESERVATION_EXPIRY"
+  if (!personalTrialExpiryScheduler) {
+    blockers.push(personalTrialExpirySchedulerPrefix)
+  } else {
+    const schedule = personalTrialExpiryScheduler.schedule || {}
+    const schedulerTarget = personalTrialExpiryScheduler.target || {}
+    const authentication = schedulerTarget.authentication || {}
+    if (personalTrialExpiryScheduler.provider !== "Aliyun EventBridge") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:provider=Aliyun EventBridge`)
+    }
+    if (personalTrialExpiryScheduler.region !== "cn-hangzhou") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:region=cn-hangzhou`)
+    }
+    if (personalTrialExpiryScheduler.sourceType !== "time-triggered custom event source") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:sourceType`)
+    }
+    if (schedule.type !== "cron") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:schedule.type=cron`)
+    }
+    if (schedule.cronExpression !== "0 */5 * * * *") {
+      blockers.push(
+        `${personalTrialExpirySchedulerPrefix}:cronExpression=0 */5 * * * *`,
+      )
+    }
+    if (schedule.timeZone !== "Asia/Shanghai") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:timeZone=Asia/Shanghai`)
+    }
+    if (schedulerTarget.type !== "API destination") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:target.type=API destination`)
+    }
+    if (schedulerTarget.network !== "Internet") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:target.network=Internet`)
+    }
+    if (schedulerTarget.method !== "GET") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:target.method=GET`)
+    }
+    if (
+      schedulerTarget.url !==
+      "https://api-cn.ipgongchang.xin/api/cron/personal-trial-reservations"
+    ) {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:target.url`)
+    }
+    if (authentication.type !== "API key header") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:authentication.type`)
+    }
+    if (authentication.headerName !== "Authorization") {
+      blockers.push(
+        `${personalTrialExpirySchedulerPrefix}:authentication.headerName=Authorization`,
+      )
+    }
+    if (authentication.secretName !== "CRON_SECRET") {
+      blockers.push(
+        `${personalTrialExpirySchedulerPrefix}:authentication.secretName=CRON_SECRET`,
+      )
+    }
+    if (authentication.valueFormat !== "Bearer <secret>") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:authentication.valueFormat`)
+    }
+    if (authentication.secretStorage !== "Aliyun EventBridge connection") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:authentication.secretStorage`)
+    }
+    if (personalTrialExpiryScheduler.requiredBeforePersonalTrialPublicEnable !== true) {
+      blockers.push(
+        `${personalTrialExpirySchedulerPrefix}:requiredBeforePersonalTrialPublicEnable=true`,
+      )
+    }
+    if (personalTrialExpiryScheduler.requiresSeparateAuthorization !== true) {
+      blockers.push(
+        `${personalTrialExpirySchedulerPrefix}:requiresSeparateAuthorization=true`,
+      )
+    }
+    if (typeof personalTrialExpiryScheduler.provisioned !== "boolean") {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:provisioned`)
+    }
+    if (!["not_run", "passed"].includes(personalTrialExpiryScheduler.verificationStatus)) {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:verificationStatus`)
+    }
+    if (
+      personalTrialExpiryScheduler.verificationStatus === "passed" &&
+      personalTrialExpiryScheduler.provisioned !== true
+    ) {
+      blockers.push(
+        `${personalTrialExpirySchedulerPrefix}:passed_requires_provisioned=true`,
+      )
+    }
+    if (personalTrialExpiryScheduler.containsValues !== false) {
+      blockers.push(`${personalTrialExpirySchedulerPrefix}:containsValues=false`)
+    }
+  }
+
   const image = plan.image || {}
   if (image.provider !== "Aliyun ACR") blockers.push("image.provider=Aliyun ACR")
   if (image.localImage !== "meiye-huajing-app-api:production-cn") blockers.push("image.localImage")
@@ -236,6 +333,11 @@ function main() {
   if (!existsSync(args.planFile)) throw new Error(`runtime_plan_not_found:${args.planFile}`)
   const plan = readJson(args.planFile)
   const validation = validatePlan(plan)
+  const personalTrialExpiryScheduler = Array.isArray(plan.scheduledRequests)
+    ? plan.scheduledRequests.find(
+      (item) => item.id === "PERSONAL_TRIAL_RESERVATION_EXPIRY",
+    )
+    : undefined
   console.log(JSON.stringify({
     ok: validation.ready,
     planFile: args.planFile,
@@ -263,11 +365,31 @@ function main() {
     predeployDependencyIds: Array.isArray(plan.predeployDependencies)
       ? plan.predeployDependencies.map((item) => item.id)
       : [],
+    personalTrialReservationExpiryScheduler: {
+      provider: personalTrialExpiryScheduler?.provider || "",
+      region: personalTrialExpiryScheduler?.region || "",
+      cronExpression:
+        personalTrialExpiryScheduler?.schedule?.cronExpression || "",
+      targetType: personalTrialExpiryScheduler?.target?.type || "",
+      targetMethod: personalTrialExpiryScheduler?.target?.method || "",
+      targetUrl: personalTrialExpiryScheduler?.target?.url || "",
+      authenticationHeaderName:
+        personalTrialExpiryScheduler?.target?.authentication?.headerName || "",
+      authenticationSecretName:
+        personalTrialExpiryScheduler?.target?.authentication?.secretName || "",
+      requiredBeforePersonalTrialPublicEnable:
+        personalTrialExpiryScheduler?.requiredBeforePersonalTrialPublicEnable ===
+        true,
+      provisioned: personalTrialExpiryScheduler?.provisioned === true,
+      verificationStatus:
+        personalTrialExpiryScheduler?.verificationStatus || "",
+    },
     blockers: validation.blockers,
     warnings: validation.warnings,
     nextActions: [
       "按 runtime plan 在阿里云 SAE 创建 production-cn 自定义容器应用，区域 cn-hangzhou，端口 3000。",
       "先完成 ACR image-publish.local.json 非密钥证据，再把 SAE runtime 指向远端镜像。",
+      "在独立授权后配置阿里云 EventBridge 每 5 分钟调用 personal-trial reservation expiry API destination，并验证鉴权与执行记录。",
       "运行 corepack pnpm aliyun:cloud:confirmations:strict 和 corepack pnpm aliyun:readiness:cloud-ready 后再部署。",
     ],
   }, null, 2))
@@ -280,7 +402,7 @@ function printHelp() {
     "  node scripts/check-aliyun-runtime-plan.mjs [--plan deploy/aliyun-production-cn.runtime-plan.json]",
     "",
     "Validates the non-secret Aliyun production-cn SAE runtime target plan.",
-    "It checks region, app name, container port, health paths, domains, image references, and secret-like values.",
+    "It checks region, app name, container port, health paths, domains, image references, scheduled requests, and secret-like values.",
   ].join("\n"))
 }
 
