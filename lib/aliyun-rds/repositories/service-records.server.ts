@@ -1,5 +1,7 @@
 import "server-only"
 
+import { randomUUID } from "node:crypto"
+
 import { NextRequest, NextResponse } from "next/server"
 
 import {
@@ -95,21 +97,101 @@ export type AliyunRdsServiceRecordAuth = {
   user: AppAuthUser
 }
 
+type ServiceRecordErrorDiagnostic = {
+  event: "service_record_request_failed"
+  request_id: string
+  operation: string
+  error_name?: string
+  db_code?: string
+  db_column?: string
+  db_constraint?: string
+  db_routine?: string
+  db_schema?: string
+  db_table?: string
+}
+
+type ServiceRecordErrorResponseOptions = {
+  requestId?: string
+  logDiagnostic?: (diagnostic: ServiceRecordErrorDiagnostic) => void
+}
+
 export function jsonError(status: number, error: string, code = error, extra?: Record<string, unknown>) {
   return NextResponse.json({ ok: false, error, code, ...(extra || {}) }, { status })
 }
 
-export function rdsServiceRecordErrorResponse(error: unknown, fallbackCode: string) {
+export function rdsServiceRecordErrorResponse(
+  error: unknown,
+  fallbackCode: string,
+  options: ServiceRecordErrorResponseOptions = {},
+) {
   const appAuthError = appAuthConfigurationErrorResponse(error)
   if (appAuthError) return appAuthError
 
+  const requestId = options.requestId || `sr_req_${randomUUID()}`
+  const message = publicServiceRecordErrorMessage(fallbackCode)
+  const diagnostic = buildServiceRecordErrorDiagnostic(error, fallbackCode, requestId)
+  const logDiagnostic =
+    options.logDiagnostic ||
+    ((entry: ServiceRecordErrorDiagnostic) => console.error(JSON.stringify(entry)))
+  logDiagnostic(diagnostic)
+
   if (error instanceof AliyunRdsConfigurationError) {
     return NextResponse.json(
-      { ok: false, error: "DATABASE_URL_CN is required", code: "rds_not_configured" },
+      {
+        ok: false,
+        error: "服务记录服务暂不可用，请联系管理员。",
+        message: "服务记录服务暂不可用，请联系管理员。",
+        code: "rds_not_configured",
+        request_id: requestId,
+      },
       { status: 503 },
     )
   }
-  return jsonError(500, error instanceof Error ? error.message : fallbackCode, fallbackCode)
+  return NextResponse.json(
+    {
+      ok: false,
+      error: message,
+      message,
+      code: fallbackCode,
+      request_id: requestId,
+    },
+    { status: 500 },
+  )
+}
+
+function publicServiceRecordErrorMessage(code: string) {
+  if (code === "insert_failed") return "创建服务记录失败，请稍后重试。"
+  if (code === "query_failed") return "读取服务记录失败，请稍后重试。"
+  return "服务记录处理失败，请稍后重试。"
+}
+
+function buildServiceRecordErrorDiagnostic(error: unknown, operation: string, requestId: string) {
+  const errorRecord =
+    error && typeof error === "object" ? (error as Record<string, unknown>) : {}
+  return compactDiagnostic({
+    event: "service_record_request_failed",
+    request_id: requestId,
+    operation,
+    error_name: error instanceof Error ? safeDiagnosticIdentifier(error.name) : undefined,
+    db_code: safeDiagnosticIdentifier(errorRecord.code),
+    db_column: safeDiagnosticIdentifier(errorRecord.column),
+    db_constraint: safeDiagnosticIdentifier(errorRecord.constraint),
+    db_routine: safeDiagnosticIdentifier(errorRecord.routine),
+    db_schema: safeDiagnosticIdentifier(errorRecord.schema),
+    db_table: safeDiagnosticIdentifier(errorRecord.table),
+  })
+}
+
+function safeDiagnosticIdentifier(value: unknown) {
+  const text = typeof value === "string" ? value.trim() : ""
+  if (!text || !/^[A-Za-z0-9_.:/-]+$/.test(text)) return undefined
+  return text.slice(0, 120)
+}
+
+function compactDiagnostic(diagnostic: ServiceRecordErrorDiagnostic) {
+  return Object.fromEntries(
+    Object.entries(diagnostic).filter(([, value]) => value !== undefined),
+  ) as ServiceRecordErrorDiagnostic
 }
 
 export function cleanText(value: unknown, max = 160) {
